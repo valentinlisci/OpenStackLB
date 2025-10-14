@@ -1,59 +1,51 @@
 ---
 - name: Deploy Load Balancer via Octavia (API OpenStack LBaaS)
   hosts: localhost
-  connection: local
   gather_facts: false
+  vars:
+    auth_params:
+      auth_url: "{{ lookup('env', 'OS_AUTH_URL') }}"
+      username: "{{ lookup('env', 'OS_USERNAME') }}"
+      password: "{{ lookup('env', 'OS_PASSWORD') }}"
+      project_name: "{{ lookup('env', 'OS_PROJECT_NAME') }}"
+      user_domain_name: "{{ lookup('env', 'OS_USER_DOMAIN_NAME') }}"
+      project_domain_name: "{{ lookup('env', 'OS_PROJECT_DOMAIN_NAME') }}"
+    region: "{{ lookup('env', 'OS_REGION_NAME') }}"
 
   tasks:
 
-    - name: Mostra variabili d’ambiente nel container di esecuzione
-      shell: env | grep OS_
+    - name: Mostra variabili d'ambiente nel container di esecuzione
+      ansible.builtin.shell: env | grep OS_
       register: env_out
 
-    - debug:
+    - name: Debug variabili OpenStack
+      ansible.builtin.debug:
         var: env_out.stdout_lines
 
     - name: Rimuovi eventuale Load Balancer esistente
       openstack.cloud.loadbalancer:
-        auth:
-          auth_url: "{{ lookup('env', 'OS_AUTH_URL') }}"
-          username: "{{ lookup('env', 'OS_USERNAME') }}"
-          password: "{{ lookup('env', 'OS_PASSWORD') }}"
-          project_name: "{{ lookup('env', 'OS_PROJECT_NAME') }}"
-          user_domain_name: "{{ lookup('env', 'OS_USER_DOMAIN_NAME') }}"
-          project_domain_name: "{{ lookup('env', 'OS_PROJECT_DOMAIN_NAME') }}"
-        region_name: "{{ lookup('env', 'OS_REGION_NAME') }}"
+        auth: "{{ auth_params }}"
+        region_name: "{{ region }}"
         state: absent
-        name: test-lb
+        name: lb_test
       ignore_errors: true
 
     - name: Crea Load Balancer (Octavia)
       openstack.cloud.loadbalancer:
-        auth:
-          auth_url: "{{ lookup('env', 'OS_AUTH_URL') }}"
-          username: "{{ lookup('env', 'OS_USERNAME') }}"
-          password: "{{ lookup('env', 'OS_PASSWORD') }}"
-          project_name: "{{ lookup('env', 'OS_PROJECT_NAME') }}"
-          user_domain_name: "{{ lookup('env', 'OS_USER_DOMAIN_NAME') }}"
-          project_domain_name: "{{ lookup('env', 'OS_PROJECT_DOMAIN_NAME') }}"
-        region_name: "{{ lookup('env', 'OS_REGION_NAME') }}"
+        auth: "{{ auth_params }}"
+        region_name: "{{ region }}"
         state: present
         name: lb_test
         vip_network: lb-mgmt-net
         wait: yes
 
-    - name: Mostra il Load Balancer creato
+    - name: Mostra informazioni sul Load Balancer creato
       openstack.cloud.loadbalancer_info:
-        auth:
-          auth_url: "{{ lookup('env', 'OS_AUTH_URL') }}"
-          username: "{{ lookup('env', 'OS_USERNAME') }}"
-          password: "{{ lookup('env', 'OS_PASSWORD') }}"
-          project_name: "{{ lookup('env', 'OS_PROJECT_NAME') }}"
-          user_domain_name: "{{ lookup('env', 'OS_USER_DOMAIN_NAME') }}"
-          project_domain_name: "{{ lookup('env', 'OS_PROJECT_DOMAIN_NAME') }}"
-        region_name: "{{ lookup('env', 'OS_REGION_NAME') }}"
+        auth: "{{ auth_params }}"
+        region_name: "{{ region }}"
         name: lb_test
       register: lb_info
 
-    - debug:
+    - name: Visualizza output del Load Balancer
+      ansible.builtin.debug:
         var: lb_info
