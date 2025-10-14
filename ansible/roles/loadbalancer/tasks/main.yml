@@ -13,7 +13,7 @@
     name: "{{ listener_name }}"
     loadbalancer: "{{ lb_name }}"
     protocol: HTTP
-    protocol_port: 80
+    protocol_port: "{{ lb_port }}" # MODIFICATO: reso dinamico
     state: present
 
 - name: Create pool
@@ -30,7 +30,7 @@
     cloud: "{{ cloud_name }}"
     pool: "{{ pool_name }}"
     address: "{{ item.address }}"
-    protocol_port: 80
+    protocol_port: "{{ lb_port }}" # MODIFICATO: reso dinamico
     subnet: "{{ lb_vip_subnet }}"
     state: present
   loop: "{{ lb_members }}"

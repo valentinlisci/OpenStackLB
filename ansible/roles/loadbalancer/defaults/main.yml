@@ -5,3 +5,4 @@ lb_vip_subnet: "subnet-id"
 listener_name: "my-listener"
 pool_name: "my-pool"
 lb_members: []
+lb_port: 80 # AGGIUNTO: default per la porta
