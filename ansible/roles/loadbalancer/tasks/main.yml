@@ -1,0 +1,36 @@
+---
+# Deploy Load Balancer via Octavia (Epoxy version)
+- name: Create load balancer
+  openstack.cloud.loadbalancer:
+    cloud: "{{ cloud_name }}"
+    name: "{{ lb_name }}"
+    vip_subnet: "{{ lb_vip_subnet }}"
+    state: present
+
+- name: Create listener
+  openstack.cloud.listener:
+    cloud: "{{ cloud_name }}"
+    name: "{{ listener_name }}"
+    loadbalancer: "{{ lb_name }}"
+    protocol: HTTP
+    protocol_port: 80
+    state: present
+
+- name: Create pool
+  openstack.cloud.pool:
+    cloud: "{{ cloud_name }}"
+    name: "{{ pool_name }}"
+    listener: "{{ listener_name }}"
+    protocol: HTTP
+    lb_algorithm: ROUND_ROBIN
+    state: present
+
+- name: Add members to pool
+  openstack.cloud.member:
+    cloud: "{{ cloud_name }}"
+    pool: "{{ pool_name }}"
+    address: "{{ item.address }}"
+    protocol_port: 80
+    subnet: "{{ lb_vip_subnet }}"
+    state: present
+  loop: "{{ lb_members }}"

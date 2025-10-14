@@ -1,0 +1,7 @@
+---
+cloud_name: "openstack"
+lb_name: "my-lb"
+lb_vip_subnet: "subnet-id"
+listener_name: "my-listener"
+pool_name: "my-pool"
+lb_members: []

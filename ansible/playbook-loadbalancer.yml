@@ -1,0 +1,15 @@
+---
+- name: Deploy Load Balancer via Octavia (Epoxy)
+  hosts: localhost
+  gather_facts: false
+  roles:
+    - role: loadbalancer
+      vars:
+        cloud_name: "openstack"
+        lb_name: "my-lb"
+        lb_vip_subnet: "subnet-id"
+        listener_name: "my-listener"
+        pool_name: "my-pool"
+        lb_members:
+          - address: "10.0.0.10"
+          - address: "10.0.0.11"
