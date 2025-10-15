@@ -1,11 +1,3 @@
-- name: Check if openstack clouds config exists
-  ansible.builtin.command: ls -la /runner/.config/openstack
-  register: result
-  ignore_errors: yes
-
-- debug:
-    var: result.stdout_lines
-    
 - name: Create simple TCP Load Balancer 
   hosts: localhost
   gather_facts: no
@@ -18,6 +10,23 @@
     vip_subnet: 22a9d3ec-e3b6-485d-b0da-3f9a169a3ac1
 
   tasks:
+
+    - name: Check if openstack clouds config exists
+      ansible.builtin.command: ls -la /runner/.config/openstack
+      register: result
+      ignore_errors: yes
+
+    - debug:
+        var: result.stdout_lines
+
+    - name: Show clouds.yaml content (if present)
+      ansible.builtin.command: cat /runner/.config/openstack/clouds.yaml
+      register: clouds_file
+      ignore_errors: yes
+
+    - debug:
+        var: clouds_file.stdout
+
     - name: Delete existing Load Balancer if present
       openstack.cloud.loadbalancer:
         cloud: "{{ cloud_name }}"
@@ -38,6 +47,3 @@
       ansible.builtin.debug:
         msg: |
           ✅ Load Balancer {{ lb_name }} (Layer 4) creato correttamente.
-          VIP: {{ lb_info.load_balancers[0].vip_address }}
-          Provider: {{ lb_info.load_balancers[0].provider }}
-          Stato: {{ lb_info.load_balancers[0].provisioning_status }}
