@@ -1,4 +1,11 @@
+- name: Check if openstack clouds config exists
+  ansible.builtin.command: ls -la /runner/.config/openstack
+  register: result
+  ignore_errors: yes
 
+- debug:
+    var: result.stdout_lines
+    
 - name: Create simple TCP Load Balancer 
   hosts: localhost
   gather_facts: no
