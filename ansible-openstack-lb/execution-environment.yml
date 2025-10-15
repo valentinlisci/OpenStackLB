@@ -1,0 +1,23 @@
+---
+version: 3
+
+images:
+  base_image:
+    name: quay.io/centos/centos:stream9
+
+dependencies:
+  ansible_core:
+    package_pip: ansible-core<2.15
+  ansible_runner:
+    package_pip: ansible-runner
+  galaxy: requirements.yml
+  python: requirements.txt
+
+additional_build_steps:
+  append_base:
+    # Aggiorna pip all'ultima versione dopo che ansible-builder lo installa
+    - RUN /usr/bin/python3 -m pip install --upgrade pip
+  append_final:
+    # (facoltativo) aggiungi altre personalizzazioni qui
+    # es: copia certificati o pacchetti di sistema extra
+    - RUN dnf install -y git

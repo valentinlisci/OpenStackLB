@@ -1,0 +1,36 @@
+
+- name: Create simple TCP Load Balancer 
+  hosts: localhost
+  gather_facts: no
+  collections:
+    - openstack.cloud
+
+  vars:
+    cloud_name: openstack
+    lb_name: l4-test2-lb
+    vip_subnet: 22a9d3ec-e3b6-485d-b0da-3f9a169a3ac1
+
+  tasks:
+    - name: Delete existing Load Balancer if present
+      openstack.cloud.loadbalancer:
+        cloud: "{{ cloud_name }}"
+        name: "{{ lb_name }}"
+        state: absent
+        wait: true
+      ignore_errors: true
+
+    - name: Create TCP Load Balancer
+      openstack.cloud.loadbalancer:
+        cloud: "{{ cloud_name }}"
+        name: "{{ lb_name }}"
+        vip_subnet: "{{ vip_subnet }}"
+        state: present
+        wait: true
+
+    - name: Print LB summary
+      ansible.builtin.debug:
+        msg: |
+          ✅ Load Balancer {{ lb_name }} (Layer 4) creato correttamente.
+          VIP: {{ lb_info.load_balancers[0].vip_address }}
+          Provider: {{ lb_info.load_balancers[0].provider }}
+          Stato: {{ lb_info.load_balancers[0].provisioning_status }}

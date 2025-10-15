@@ -1,0 +1,4 @@
+# requirements.txt
+openstacksdk
+python-openstackclient
+urllib3<2
