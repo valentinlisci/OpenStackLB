@@ -22,8 +22,8 @@ ARG PKGMGR
 
 COPY _build/scripts/ /output/scripts/
 COPY _build/scripts/entrypoint /opt/builder/bin/entrypoint
-RUN mkdir -p /root/.config/openstack
-COPY _build/clouds.yml /root/.config/openstack/clouds.yml
+RUN mkdir -p /runner/.config/openstack
+COPY _build/clouds.yml /runner/.config/openstack/clouds.yml
 RUN $PKGMGR install $PYPKG -y ; if [ -z $PKGMGR_PRESERVE_CACHE ]; then $PKGMGR clean all; fi
 RUN /output/scripts/pip_install $PYCMD
 RUN $PYCMD -m pip install --no-cache-dir $ANSIBLE_INSTALL_REFS
@@ -90,6 +90,7 @@ RUN chmod ug+rw /etc/passwd
 RUN mkdir -p /runner && chgrp 0 /runner && chmod -R ug+rwx /runner
 WORKDIR /runner
 RUN $PYCMD -m pip install --no-cache-dir 'dumb-init==1.2.5'
+ENV OS_CLIENT_CONFIG_FILE=/runner/.config/openstack/clouds.yml
 ENV ANSIBLE_FORCE_COLOR=1
 ENV ANSIBLE_HOST_KEY_CHECKING=False
 ENV PATH="/usr/local/bin:${PATH}"

@@ -17,9 +17,10 @@ dependencies:
 
 additional_build_steps:
   prepend_base:
-    - RUN mkdir -p /root/.config/openstack
-    - COPY _build/clouds.yml /root/.config/openstack/clouds.yml
+     - RUN mkdir -p /runner/.config/openstack
+     - COPY _build/clouds.yml /runner/.config/openstack/clouds.yml
   append_final:
+    - ENV OS_CLIENT_CONFIG_FILE=/runner/.config/openstack/clouds.yml
     - ENV ANSIBLE_FORCE_COLOR=1
     - ENV ANSIBLE_HOST_KEY_CHECKING=False
     - ENV PATH="/usr/local/bin:${PATH}"
