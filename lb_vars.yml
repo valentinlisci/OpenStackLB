@@ -1,0 +1,26 @@
+# /opt/mycode/awx-git/OpenStackLB/vars/lb_vars.yml
+
+cloud_name: openstack
+
+# Load Balancer
+lb_name: awx-test-lb-l4
+lb_description: "L4 TCP Load Balancer via Ansible Galaxy"
+lb_vip_subnet: "22a9d3ec-e3b6-485d-b0da-3f9a169a3ac1"
+lb_provider: amphora
+
+# Listener L4
+listener_name: tcp-listener
+listener_protocol: TCP
+listener_port: 8080
+
+# Pool L4
+pool_name: tcp-pool
+pool_protocol: TCP
+lb_algorithm: ROUND_ROBIN
+
+# Membri backend
+lb_members:
+  - address: 10.0.0.11
+    protocol_port: 8080
+  - address: 10.0.0.12
+    protocol_port: 8080

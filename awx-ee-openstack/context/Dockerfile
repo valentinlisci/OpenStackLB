@@ -1,10 +1,11 @@
-ARG EE_BASE_IMAGE="quay.io/centos/centos:stream9"
-ARG PYCMD="/usr/bin/python3"
+ARG EE_BASE_IMAGE="python:3.9.23-slim"
+ARG PYCMD="/usr/local/bin/python3"
+ARG PYPKG="python3"
 ARG PKGMGR_PRESERVE_CACHE=""
 ARG ANSIBLE_GALAXY_CLI_COLLECTION_OPTS=""
 ARG ANSIBLE_GALAXY_CLI_ROLE_OPTS=""
-ARG ANSIBLE_INSTALL_REFS="ansible-core<2.15 ansible-runner"
-ARG PKGMGR="/usr/bin/dnf"
+ARG ANSIBLE_INSTALL_REFS="ansible-core==2.14.18 ansible-runner==2.3.4"
+ARG PKGMGR="/usr/bin/apt-get"
 
 # Base build stage
 FROM $EE_BASE_IMAGE as base
@@ -12,6 +13,7 @@ USER root
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 ARG EE_BASE_IMAGE
 ARG PYCMD
+ARG PYPKG
 ARG PKGMGR_PRESERVE_CACHE
 ARG ANSIBLE_GALAXY_CLI_COLLECTION_OPTS
 ARG ANSIBLE_GALAXY_CLI_ROLE_OPTS
@@ -20,14 +22,17 @@ ARG PKGMGR
 
 COPY _build/scripts/ /output/scripts/
 COPY _build/scripts/entrypoint /opt/builder/bin/entrypoint
+RUN mkdir -p /root/.config/openstack
+COPY _build/clouds.yml /root/.config/openstack/clouds.yml
+RUN $PKGMGR install $PYPKG -y ; if [ -z $PKGMGR_PRESERVE_CACHE ]; then $PKGMGR clean all; fi
 RUN /output/scripts/pip_install $PYCMD
 RUN $PYCMD -m pip install --no-cache-dir $ANSIBLE_INSTALL_REFS
-RUN /usr/bin/python3 -m pip install --upgrade pip
 
 # Galaxy build stage
 FROM base as galaxy
 ARG EE_BASE_IMAGE
 ARG PYCMD
+ARG PYPKG
 ARG PKGMGR_PRESERVE_CACHE
 ARG ANSIBLE_GALAXY_CLI_COLLECTION_OPTS
 ARG ANSIBLE_GALAXY_CLI_ROLE_OPTS
@@ -48,6 +53,7 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
 WORKDIR /build
 ARG EE_BASE_IMAGE
 ARG PYCMD
+ARG PYPKG
 ARG PKGMGR_PRESERVE_CACHE
 ARG ANSIBLE_GALAXY_CLI_COLLECTION_OPTS
 ARG ANSIBLE_GALAXY_CLI_ROLE_OPTS
@@ -67,6 +73,7 @@ FROM base as final
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 ARG EE_BASE_IMAGE
 ARG PYCMD
+ARG PYPKG
 ARG PKGMGR_PRESERVE_CACHE
 ARG ANSIBLE_GALAXY_CLI_COLLECTION_OPTS
 ARG ANSIBLE_GALAXY_CLI_ROLE_OPTS
@@ -83,9 +90,11 @@ RUN chmod ug+rw /etc/passwd
 RUN mkdir -p /runner && chgrp 0 /runner && chmod -R ug+rwx /runner
 WORKDIR /runner
 RUN $PYCMD -m pip install --no-cache-dir 'dumb-init==1.2.5'
-RUN dnf install -y git
+ENV ANSIBLE_FORCE_COLOR=1
+ENV ANSIBLE_HOST_KEY_CHECKING=False
+ENV PATH="/usr/local/bin:${PATH}"
 RUN rm -rf /output
 LABEL ansible-execution-environment=true
-USER 1000
+USER root
 ENTRYPOINT ["/opt/builder/bin/entrypoint", "dumb-init"]
 CMD ["bash"]

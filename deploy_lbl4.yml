@@ -1,4 +1,5 @@
-- name: Create simple TCP Load Balancer 
+---
+- name: Create L4 TCP Load Balancer using openstack.cloud 2.4.1 (no CLI)
   hosts: localhost
   gather_facts: no
   collections:
@@ -6,44 +7,72 @@
 
   vars:
     cloud_name: openstack
-    lb_name: l4-test2-lb
-    vip_subnet: 22a9d3ec-e3b6-485d-b0da-3f9a169a3ac1
+    lb_name: awx-test-lb-l4-corretto
+    lb_vip_subnet: "22a9d3ec-e3b6-485d-b0da-3f9a169a3ac1"
+    listener_name: tcp-listener
+    listener_port: 8080
+    pool_name: tcp-pool
+    lb_algorithm: ROUND_ROBIN
+    lb_members:
+      - address: 10.0.0.11
+        protocol_port: 8080
+      - address: 10.0.0.12
+        protocol_port: 8080
 
   tasks:
-
-    - name: Check if openstack clouds config exists
-      ansible.builtin.command: ls -la /runner/.config/openstack
-      register: result
-      ignore_errors: yes
-
-    - debug:
-        var: result.stdout_lines
-
-    - name: Show clouds.yaml content (if present)
-      ansible.builtin.command: cat /runner/.config/openstack/clouds.yaml
-      register: clouds_file
-      ignore_errors: yes
-
-    - debug:
-        var: clouds_file.stdout
-
-    - name: Delete existing Load Balancer if present
+    - name: Ensure no existing load balancer (cleanup)
       openstack.cloud.loadbalancer:
         cloud: "{{ cloud_name }}"
         name: "{{ lb_name }}"
         state: absent
-        wait: true
-      ignore_errors: true
+      ignore_errors: yes
 
-    - name: Create TCP Load Balancer
+    - name: Create Load Balancer (Amphora provider assumed)
       openstack.cloud.loadbalancer:
         cloud: "{{ cloud_name }}"
         name: "{{ lb_name }}"
-        vip_subnet: "{{ vip_subnet }}"
+        vip_subnet: "{{ lb_vip_subnet }}"
         state: present
-        wait: true
+        wait: yes
+        timeout: 800
 
-    - name: Print LB summary
+    - name: Create TCP Listener
+      openstack.cloud.lb_listener:
+        cloud: "{{ cloud_name }}"
+        load_balancer: "{{ lb_name }}"
+        name: "{{ listener_name }}"
+        protocol: TCP
+        protocol_port: "{{ listener_port }}"
+        state: present
+        wait: yes
+        timeout: 120
+
+    - name: Create TCP Pool
+      openstack.cloud.lb_pool:
+        cloud: "{{ cloud_name }}"
+        listener: "{{ listener_name }}"
+        name: "{{ pool_name }}"
+        protocol: TCP
+        lb_algorithm: "{{ lb_algorithm }}"
+        state: present
+        wait: yes
+        timeout: 120
+
+    - name: Add members to pool
+      openstack.cloud.lb_member:
+        cloud: "{{ cloud_name }}"
+        pool: "{{ pool_name }}"
+        name: "member-{{ item.address }}-{{ item.protocol_port }}"
+        address: "{{ item.address }}"
+        protocol_port: "{{ item.protocol_port }}"
+        subnet_id: "{{ lb_vip_subnet }}"
+        state: present
+      loop: "{{ lb_members }}"
+
+    - name: Show success message
       ansible.builtin.debug:
         msg: |
-          ✅ Load Balancer {{ lb_name }} (Layer 4) creato correttamente.
+          ✅ L4 Load Balancer creato con successo!
+          Nome: {{ lb_name }}
+          Porta: {{ listener_port }}
+          Membri: {{ lb_members | map(attribute='address') | list }}
