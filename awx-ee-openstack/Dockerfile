@@ -9,6 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libyaml-dev \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
+    
+# Copia del clouds.yml nel path standard di OpenStack
+RUN mkdir -p /etc/openstack
+COPY clouds.yml /etc/openstack/clouds.yaml
 
 # Imposta locale e ambiente
 ENV LANG=en_US.UTF-8
