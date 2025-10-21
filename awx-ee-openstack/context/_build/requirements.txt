@@ -2,4 +2,5 @@ ansible-core==2.14.18
 openstacksdk==4.5.0
 python-openstackclient==8.0.0
 python-octaviaclient==2.4.0
+munch
 

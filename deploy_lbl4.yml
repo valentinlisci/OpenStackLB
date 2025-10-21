@@ -78,11 +78,13 @@
           Membri: {{ lb_members | map(attribute='address') | list }}
 
     - name: Get Load Balancer VIP port ID via CLI
-      ansible.builtin.command: >
-        openstack --os-cloud {{ cloud_name }}
-        loadbalancer show {{ lb_name }}
-        -f value -c vip_port_id
-      register: lb_vip_port_id
+      command: >
+        openstack --os-cloud openstack loadbalancer show awx-test-lb-l4-corretto -f json
+      register: lb_info_json
+
+    - set_fact:
+        lb_vip_port_id: "{{ (lb_info_json.stdout | from_json).vip_port_id }}"
+
 
     - name: Get Load Balancer VIP address via CLI
       ansible.builtin.command: >
