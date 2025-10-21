@@ -8,7 +8,7 @@
   vars:
     cloud_name: openstack
     lb_name: awx-test-lb-l4-corretto
-    lb_vip_subnet: "fffe042c-ba04-4f55-a7c9-347b0f88268d"
+    lb_vip_subnet: "d126b00a-8fab-48b4-bc55-0f05c6aacc8e" 
     listener_name: tcp-listener
     listener_port: 8080
     pool_name: tcp-pool

@@ -1,0 +1,12 @@
+clouds:
+  openstack:
+    auth:
+      auth_url: https://dashboard.xaaslab.it:5000
+      username: "sourcesense"
+      password: "Sb8*lW05yD4E}n."
+      project_id: 3d9eb9453bd44b52b17c39462caf17a8
+      project_name: "awx_test"
+      user_domain_name: "Default"
+    region_name: "Milano"
+    interface: "public"
+    identity_api_version: 3
