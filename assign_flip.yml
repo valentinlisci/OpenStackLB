@@ -1,0 +1,44 @@
+---
+- name: Associate Floating IP to the newly created Load Balancer
+  hosts: localhost
+  gather_facts: false
+  collections:
+    - openstack.cloud
+
+  vars:
+    cloud_name: "openstack"
+    existing_fip: "5.9.220.190"  # Sovrascrivibile da AWX survey
+    description: "FIP associato automaticamente al Load Balancer creato nel workflow"
+
+  tasks:
+
+    - name: Check required input
+      ansible.builtin.fail:
+        msg: "❌ Variabile 'lb_output' mancante: il playbook deve essere eseguito in workflow dopo la creazione del Load Balancer."
+      when: lb_output is not defined
+
+    - name: Show inherited Load Balancer info
+      ansible.builtin.debug:
+        msg:
+          - "🎯 Nome LB: {{ lb_output.name }}"
+          - "VIP Port ID: {{ lb_output.vip_port_id }}"
+          - "VIP Address: {{ lb_output.vip_address }}"
+
+    - name: Associate existing Floating IP via SDK script
+      ansible.builtin.command: >
+        /usr/local/bin/assign_fip_lb.py
+      environment:
+        CLOUD_NAME: "{{ cloud_name }}"
+        EXISTING_FIP: "{{ existing_fip }}"
+        PORT_ID: "{{ lb_output.vip_port_id }}"
+        DESCRIPTION: "{{ description }}"
+      register: assign_result
+      changed_when: "'associated' in assign_result.stdout or 'created' in assign_result.stdout"
+
+    - name: Show script output
+      ansible.builtin.debug:
+        var: assign_result.stdout
+
+    - name: Success message
+      ansible.builtin.debug:
+        msg: "✅ Floating IP {{ existing_fip }} associato con successo al Load Balancer {{ lb_output.name }}"

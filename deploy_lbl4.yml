@@ -69,54 +69,18 @@
         state: present
       loop: "{{ lb_members }}"
 
-    - name: Show success message
+    - name: Set output facts for workflow
+      ansible.builtin.set_fact:
+        lb_output:
+          name: "{{ lb_info_final.loadbalancers[0].name }}"
+          vip_port_id: "{{ lb_info_final.loadbalancers[0].vip_port_id }}"
+          vip_address: "{{ lb_info_final.loadbalancers[0].vip_address }}"
+          id: "{{ lb_info_final.loadbalancers[0].id }}"
+          
+    - name: Print LB info for workflow output
       ansible.builtin.debug:
-        msg: |
-          ✅ L4 Load Balancer creato con successo!
-          Nome: {{ lb_name }}
-          Porta: {{ listener_port }}
-          Membri: {{ lb_members | map(attribute='address') | list }}
-
-    - name: Get Load Balancer VIP port ID via CLI
-      command: >
-        openstack --os-cloud openstack loadbalancer show awx-test-lb-l4-corretto -f json
-      register: lb_info_json
-
-    - set_fact:
-        lb_vip_port_id: "{{ (lb_info_json.stdout | from_json).vip_port_id }}"
-
-
-    - name: Get Load Balancer VIP address via CLI
-      ansible.builtin.command: >
-        openstack --os-cloud {{ cloud_name }}
-        loadbalancer show {{ lb_name }}
-        -f value -c vip_address
-      register: lb_vip_address
-
-    - name: Allocate Floating IP via CLI
-      ansible.builtin.command: >
-        openstack --os-cloud {{ cloud_name }}
-        floating ip create external_pub_vlan20
-        -f value -c id
-      register: fip_id
-
-    - name: Associate Floating IP to Load Balancer VIP port via CLI
-      ansible.builtin.command: >
-        openstack --os-cloud {{ cloud_name }}
-        floating ip set --port {{ lb_vip_port_id.stdout }}
-        {{ fip_id.stdout }}
-
-    - name: Get public Floating IP address
-      ansible.builtin.command: >
-        openstack --os-cloud {{ cloud_name }}
-        floating ip show {{ fip_id.stdout }}
-        -f value -c floating_ip_address
-      register: fip_public_ip
-
-    - name: Display final summary
-      ansible.builtin.debug:
-        msg: |
-          ✅ Load Balancer creato e pubblicato con successo!
-          Nome: {{ lb_name }}
-          VIP interno: {{ lb_vip_address.stdout }}
-          Floating IP pubblico: {{ fip_public_ip.stdout }}
+        msg:
+          - "✅ Load Balancer creato con successo!"
+          - "Nome: {{ lb_output.name }}"
+          - "VIP Address: {{ lb_output.vip_address }}"
+          - "VIP Port ID: {{ lb_output.vip_port_id }}"
