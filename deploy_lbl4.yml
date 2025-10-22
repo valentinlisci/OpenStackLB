@@ -74,7 +74,7 @@
         openstack --os-cloud {{ cloud_name }} loadbalancer show {{ lb_name }} -f yaml
       register: lb_yaml_result
       until: lb_yaml_result.rc == 0
-      retries: 20
+      retries: 10
       delay: 5
       changed_when: false
       failed_when: lb_yaml_result.rc != 0
