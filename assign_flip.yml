@@ -1,28 +1,47 @@
 ---
-- name: Associate Floating IP to the newly created Load Balancer
+- name: Associate existing Floating IP to Load Balancer
   hosts: localhost
-  gather_facts: false
-  collections:
-    - openstack.cloud
+  gather_facts: no
 
   vars:
-    cloud_name: "openstack"
-    existing_fip: "5.9.220.190"  # Sovrascrivibile da AWX survey
-    description: "FIP associato automaticamente al Load Balancer creato nel workflow"
+    cloud_name: "{{ cloud_name | default('openstack') }}"
+    lb_name: "{{ lb_output.name | default('awx-test-lb-l4-corretto') }}"
+    vip_port_id: "{{ lb_output.vip_port_id | default(omit) }}"
+    existing_fip: "{{ existing_fip | default('5.9.220.190') }}"
+    description: "Floating IP associato automaticamente al Load Balancer {{ lb_name }}"
 
   tasks:
 
-    - name: Check required input
-      ansible.builtin.fail:
-        msg: "❌ Variabile 'lb_output' mancante: il playbook deve essere eseguito in workflow dopo la creazione del Load Balancer."
-      when: lb_output is not defined
-
-    - name: Show inherited Load Balancer info
+    - name: Debug workflow input
       ansible.builtin.debug:
         msg:
-          - "🎯 Nome LB: {{ lb_output.name }}"
-          - "VIP Port ID: {{ lb_output.vip_port_id }}"
-          - "VIP Address: {{ lb_output.vip_address }}"
+          - "🏗️ Cloud: {{ cloud_name }}"
+          - "🏗️ Load Balancer: {{ lb_name }}"
+          - "🏗️ VIP Port ID: {{ vip_port_id | default('da determinare') }}"
+          - "🏗️ Floating IP: {{ existing_fip }}"
+
+    - name: Retrieve Load Balancer VIP Port ID (if not provided)
+      when: vip_port_id is not defined
+      ansible.builtin.command: >
+        python3 -c "import openstack, json;
+        conn=openstack.connect(cloud='{{ cloud_name }}');
+        lb=conn.load_balancer.find_load_balancer('{{ lb_name }}');
+        import sys;
+        sys.exit(1) if not lb else None;
+        full=conn.load_balancer.get_load_balancer(lb);
+        print(full.vip_port_id)"
+      register: vip_id_cmd
+      changed_when: false
+      failed_when: vip_id_cmd.rc != 0
+
+    - name: Set VIP Port ID if retrieved
+      when: vip_port_id is not defined
+      ansible.builtin.set_fact:
+        vip_port_id: "{{ vip_id_cmd.stdout }}"
+
+    - name: Debug final VIP Port ID
+      ansible.builtin.debug:
+        msg: "✅ VIP Port ID finale: {{ vip_port_id }}"
 
     - name: Associate existing Floating IP via SDK script
       ansible.builtin.command: >
@@ -30,15 +49,9 @@
       environment:
         CLOUD_NAME: "{{ cloud_name }}"
         EXISTING_FIP: "{{ existing_fip }}"
-        PORT_ID: "{{ lb_output.vip_port_id }}"
+        PORT_ID: "{{ vip_port_id }}"
         DESCRIPTION: "{{ description }}"
-      register: assign_result
-      changed_when: "'associated' in assign_result.stdout or 'created' in assign_result.stdout"
-
-    - name: Show script output
-      ansible.builtin.debug:
-        var: assign_result.stdout
 
     - name: Success message
       ansible.builtin.debug:
-        msg: "✅ Floating IP {{ existing_fip }} associato con successo al Load Balancer {{ lb_output.name }}"
+        msg: "✅ Floating IP {{ existing_fip }} associato con successo al Load Balancer {{ lb_name }}"
