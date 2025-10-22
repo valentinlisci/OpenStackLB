@@ -8,7 +8,7 @@
   vars:
     cloud_name: openstack
     lb_name: awx-test-lb-l4-corretto
-    lb_vip_subnet: "d126b00a-8fab-48b4-bc55-0f05c6aacc8e" 
+    lb_vip_subnet: "d126b00a-8fab-48b4-bc55-0f05c6aacc8e"
     listener_name: tcp-listener
     listener_port: 8080
     pool_name: tcp-pool
@@ -20,6 +20,7 @@
         protocol_port: 8080
 
   tasks:
+
     - name: Ensure no existing load balancer (cleanup)
       openstack.cloud.loadbalancer:
         cloud: "{{ cloud_name }}"
@@ -68,20 +69,21 @@
         subnet_id: "{{ lb_vip_subnet }}"
         state: present
       loop: "{{ lb_members }}"
- 
-    - name: Wait for the Load Balancer to appear in OpenStack
-      ansible.builtin.command: >
-        openstack --os-cloud {{ cloud_name }} loadbalancer show {{ lb_name }} -f yaml
-      register: lb_yaml_result
-      until: lb_yaml_result.rc == 0
-      retries: 10
-      delay: 5
-      changed_when: false
-      failed_when: lb_yaml_result.rc != 0
 
-    - name: Parse Load Balancer YAML output
+    - name: Retrieve Load Balancer info using OpenStack SDK (no CLI)
+      ansible.builtin.command: >
+        python3 -c "import openstack, json; conn=openstack.connect(cloud='{{ cloud_name }}'); lb=conn.load_balancer.find_load_balancer('{{ lb_name }}'); 
+        import sys; 
+        sys.exit(1) if not lb else None; 
+        full=conn.load_balancer.get_load_balancer(lb); 
+        print(json.dumps({'name': full.name, 'vip_address': full.vip_address, 'vip_port_id': full.vip_port_id, 'id': full.id}))"
+      register: lb_info_json
+      changed_when: false
+      failed_when: lb_info_json.rc != 0
+
+    - name: Parse SDK output
       ansible.builtin.set_fact:
-        lb_data: "{{ lb_yaml_result.stdout | from_yaml }}"
+        lb_data: "{{ lb_info_json.stdout | from_json }}"
 
     - name: Set output facts for workflow
       ansible.builtin.set_fact:
