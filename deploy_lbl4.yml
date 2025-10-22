@@ -68,6 +68,12 @@
         subnet_id: "{{ lb_vip_subnet }}"
         state: present
       loop: "{{ lb_members }}"
+ 
+    - name: Retrieve final Load Balancer info
+      openstack.cloud.loadbalancer_info:
+        cloud: "{{ cloud_name }}"
+        name: "{{ lb_name }}"
+      register: lb_info_final
 
     - name: Set output facts for workflow
       ansible.builtin.set_fact:
@@ -76,7 +82,7 @@
           vip_port_id: "{{ lb_info_final.loadbalancers[0].vip_port_id }}"
           vip_address: "{{ lb_info_final.loadbalancers[0].vip_address }}"
           id: "{{ lb_info_final.loadbalancers[0].id }}"
-          
+
     - name: Print LB info for workflow output
       ansible.builtin.debug:
         msg:
