@@ -71,17 +71,17 @@
  
     - name: Wait for the Load Balancer to appear in OpenStack
       ansible.builtin.command: >
-        openstack --os-cloud {{ cloud_name }} loadbalancer show {{ lb_name }} -f json
-      register: lb_json_result
-      until: lb_json_result.rc == 0
+        openstack --os-cloud {{ cloud_name }} loadbalancer show {{ lb_name }} -f yaml
+      register: lb_yaml_result
+      until: lb_yaml_result.rc == 0
       retries: 20
-      delay: 8
+      delay: 5
       changed_when: false
-      failed_when: lb_json_result.rc != 0
+      failed_when: lb_yaml_result.rc != 0
 
-    - name: Parse Load Balancer JSON output
+    - name: Parse Load Balancer YAML output
       ansible.builtin.set_fact:
-        lb_data: "{{ lb_json_result.stdout | from_json }}"
+        lb_data: "{{ lb_yaml_result.stdout | from_yaml }}"
 
     - name: Set output facts for workflow
       ansible.builtin.set_fact:
