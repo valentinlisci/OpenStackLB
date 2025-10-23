@@ -59,16 +59,31 @@
         wait: yes
         timeout: 120
 
-    - name: Add members to pool
-      openstack.cloud.lb_member:
-        cloud: "{{ cloud_name }}"
-        pool: "{{ pool_name }}"
-        name: "member-{{ item.address }}-{{ item.protocol_port }}"
-        address: "{{ item.address }}"
-        protocol_port: "{{ item.protocol_port }}"
-        subnet_id: "{{ lb_vip_subnet }}"
-        state: present
+    - name: Add pool members one by one with wait for ACTIVE state
+      vars:
+        delay_between_members: 10
       loop: "{{ lb_members }}"
+      loop_control:
+        loop_var: member
+      block:
+        - name: Add member to pool
+          openstack.cloud.lb_member:
+            cloud: "{{ cloud_name }}"
+            pool: "{{ pool_name }}"
+            name: "member-{{ member.address }}-{{ member.protocol_port }}"
+            address: "{{ member.address }}"
+            protocol_port: "{{ member.protocol_port }}"
+            subnet_id: "{{ lb_vip_subnet }}"
+            state: present
+
+        - name: Wait for Load Balancer to return to ACTIVE
+          openstack.cloud.loadbalancer_info:
+            cloud: "{{ cloud_name }}"
+            name: "{{ lb_name }}"
+          register: lb_status
+          until: lb_status.loadbalancers[0].provisioning_status == "ACTIVE"
+          retries: 30
+          delay: "{{ delay_between_members }}"
 
     - name: Retrieve Load Balancer info using OpenStack SDK (no CLI)
       ansible.builtin.command: >
