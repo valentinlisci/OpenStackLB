@@ -76,7 +76,7 @@
             subnet_id: "{{ lb_vip_subnet }}"
             state: present
 
-        - name: Wait for Load Balancer to return to ACTIVE
+        - name: Wait for Load Balancer to return ACTIVE
           openstack.cloud.loadbalancer_info:
             cloud: "{{ cloud_name }}"
             name: "{{ lb_name }}"
