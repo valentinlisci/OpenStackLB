@@ -21,18 +21,6 @@
         protocol_port: 8080
 
   tasks:
-
-    - name: Ottieni nome del tenant effettivo da clouds.yml (metodo Python)
-      ansible.builtin.command: >
-        python3 -c "import yaml, sys;
-        data = yaml.safe_load(open('/etc/openstack/clouds.yml'));
-        print(data['clouds']['{{ cloud_name }}']['auth']['project_name'])"
-      register: tenant_name_raw
-      changed_when: false
-
-    - set_fact:
-        tenant_name: "{{ tenant_name_raw.stdout }}"
-
     - name: Rimuovi eventuale Load Balancer esistente (cleanup)
       openstack.cloud.loadbalancer:
         cloud: "{{ cloud_name }}"
