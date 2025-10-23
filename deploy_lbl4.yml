@@ -62,10 +62,10 @@
     - name: Add pool members one by one with wait for ACTIVE state
       vars:
         delay_between_members: 10
-      loop: "{{ lb_members }}"
+      with_items: "{{ lb_members }}"
       loop_control:
         loop_var: member
-      block:
+      tasks:
         - name: Add member to pool
           openstack.cloud.lb_member:
             cloud: "{{ cloud_name }}"
