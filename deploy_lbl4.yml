@@ -22,15 +22,16 @@
 
   tasks:
 
-    - name: Ottieni il nome del tenant effettivo da clouds.yml
-      set_fact:
-        tenant_name: >-
-          {{ lookup('community.general.yaml', '/etc/openstack/clouds.yml')
-             .clouds[cloud_name].auth.project_name }}
+    - name: Ottieni nome del tenant effettivo da clouds.yml (metodo Python)
+      ansible.builtin.command: >
+        python3 -c "import yaml, sys;
+        data = yaml.safe_load(open('/etc/openstack/clouds.yml'));
+        print(data['clouds']['{{ cloud_name }}']['auth']['project_name'])"
+      register: tenant_name_raw
+      changed_when: false
 
-    - name: Costruisci nome completo del Load Balancer
-      set_fact:
-        full_lb_name: "{{ tenant_name }}-{{ lb_name }}"
+    - set_fact:
+        tenant_name: "{{ tenant_name_raw.stdout }}"
 
     - name: Rimuovi eventuale Load Balancer esistente (cleanup)
       openstack.cloud.loadbalancer:
