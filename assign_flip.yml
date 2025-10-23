@@ -1,5 +1,5 @@
 ---
-- name: Associate existing Floating IP to Load Balancer
+- name: Associate existing Floating IP to Load Balancer (OpenStack-safe)
   hosts: localhost
   gather_facts: no
 
@@ -9,49 +9,65 @@
     vip_port_id: "{{ lb_output.vip_port_id | default(omit) }}"
     existing_fip: "{{ existing_fip | default('5.9.220.190') }}"
     description: "Floating IP associato automaticamente al Load Balancer {{ lb_name }}"
+    timeout_seconds: 25
 
   tasks:
 
-    - name: Debug workflow input
+    - name: Debug iniziale
       ansible.builtin.debug:
         msg:
           - "🏗️ Cloud: {{ cloud_name }}"
           - "🏗️ Load Balancer: {{ lb_name }}"
-          - "🏗️ VIP Port ID: {{ vip_port_id | default('da determinare') }}"
-          - "🏗️ Floating IP: {{ existing_fip }}"
+          - "🏗️ Floating IP da associare: {{ existing_fip }}"
+          - "🏗️ VIP Port ID (iniziale): {{ vip_port_id | default('da determinare') }}"
 
-    - name: Retrieve Load Balancer VIP Port ID (if not provided)
+    - name: Recupera VIP Port ID se non specificato
       when: vip_port_id is not defined
       ansible.builtin.command: >
-        python3 -c "import openstack, json;
+        timeout {{ timeout_seconds }}s python3 -c
+        "import openstack, sys;
         conn=openstack.connect(cloud='{{ cloud_name }}');
         lb=conn.load_balancer.find_load_balancer('{{ lb_name }}');
-        import sys;
         sys.exit(1) if not lb else None;
         full=conn.load_balancer.get_load_balancer(lb);
         print(full.vip_port_id)"
-      register: vip_id_cmd
+      register: vip_result
       changed_when: false
-      failed_when: vip_id_cmd.rc != 0
+      failed_when: vip_result.rc != 0
 
-    - name: Set VIP Port ID if retrieved
+    - name: Imposta VIP Port ID
       when: vip_port_id is not defined
       ansible.builtin.set_fact:
-        vip_port_id: "{{ vip_id_cmd.stdout }}"
+        vip_port_id: "{{ vip_result.stdout | trim }}"
 
-    - name: Debug final VIP Port ID
+    - name: Debug VIP Port ID finale
       ansible.builtin.debug:
         msg: "✅ VIP Port ID finale: {{ vip_port_id }}"
 
-    - name: Associate existing Floating IP via SDK script
+    - name: Associa Floating IP pubblico al Load Balancer
       ansible.builtin.command: >
-        /usr/local/bin/assign_fip_lb.py
+        timeout {{ timeout_seconds }}s /usr/local/bin/assign_fip_lb.py
       environment:
         CLOUD_NAME: "{{ cloud_name }}"
         EXISTING_FIP: "{{ existing_fip }}"
         PORT_ID: "{{ vip_port_id }}"
         DESCRIPTION: "{{ description }}"
+      register: assign_result
+      changed_when: false
+      ignore_errors: true
 
-    - name: Success message
+    - name: Debug risultato
       ansible.builtin.debug:
-        msg: "✅ Floating IP {{ existing_fip }} associato con successo al Load Balancer {{ lb_name }}"
+        msg:
+          - "🧩 RC: {{ assign_result.rc }}"
+          - "🧩 STDOUT: {{ assign_result.stdout }}"
+          - "🧩 STDERR: {{ assign_result.stderr }}"
+
+    - name: Risultato finale
+      ansible.builtin.debug:
+        msg: >-
+          {% if assign_result.rc == 0 %}
+          ✅ Floating IP {{ existing_fip }} associato con successo al Load Balancer {{ lb_name }}
+          {% else %}
+          ❌ Errore durante l'associazione. Controlla i log sopra.
+          {% endif %}
