@@ -4,7 +4,6 @@
   gather_facts: no
   collections:
     - openstack.cloud
-    - community.general
 
   vars:
     cloud_name: openstack
@@ -21,27 +20,27 @@
         protocol_port: 8080
 
   tasks:
-    - name: Rimuovi eventuale Load Balancer esistente (cleanup)
+
+    - name: Ensure no existing load balancer (cleanup)
       openstack.cloud.loadbalancer:
         cloud: "{{ cloud_name }}"
-        name: "{{ full_lb_name }}"
+        name: "{{ lb_name }}"
         state: absent
       ignore_errors: yes
 
-    - name: Crea Load Balancer (Amphora provider assumed)
+    - name: Create Load Balancer (Amphora provider assumed)
       openstack.cloud.loadbalancer:
         cloud: "{{ cloud_name }}"
-        name: "{{ full_lb_name }}"
+        name: "{{ lb_name }}"
         vip_subnet: "{{ lb_vip_subnet }}"
-        description: "Created by AWX for tenant {{ tenant_name }}"
         state: present
         wait: yes
         timeout: 800
 
-    - name: Crea TCP Listener
+    - name: Create TCP Listener
       openstack.cloud.lb_listener:
         cloud: "{{ cloud_name }}"
-        load_balancer: "{{ full_lb_name }}"
+        load_balancer: "{{ lb_name }}"
         name: "{{ listener_name }}"
         protocol: TCP
         protocol_port: "{{ listener_port }}"
@@ -49,7 +48,7 @@
         wait: yes
         timeout: 120
 
-    - name: Crea TCP Pool
+    - name: Create TCP Pool
       openstack.cloud.lb_pool:
         cloud: "{{ cloud_name }}"
         listener: "{{ listener_name }}"
@@ -60,7 +59,7 @@
         wait: yes
         timeout: 120
 
-    - name: Aggiungi membri al Pool
+    - name: Add members to pool
       openstack.cloud.lb_member:
         cloud: "{{ cloud_name }}"
         pool: "{{ pool_name }}"
@@ -71,11 +70,11 @@
         state: present
       loop: "{{ lb_members }}"
 
-    - name: Recupera informazioni del Load Balancer con OpenStack SDK
+    - name: Retrieve Load Balancer info using OpenStack SDK (no CLI)
       ansible.builtin.command: >
         python3 -c "import openstack, json;
         conn=openstack.connect(cloud='{{ cloud_name }}');
-        lb=conn.load_balancer.find_load_balancer('{{ full_lb_name }}');
+        lb=conn.load_balancer.find_load_balancer('{{ lb_name }}');
         import sys;
         sys.exit(1) if not lb else None;
         full=conn.load_balancer.get_load_balancer(lb);
@@ -84,11 +83,11 @@
       changed_when: false
       failed_when: lb_info_json.rc != 0
 
-    - name: Analizza output SDK
+    - name: Parse SDK output
       ansible.builtin.set_fact:
         lb_data: "{{ lb_info_json.stdout | from_json }}"
 
-    - name: Imposta output per Workflow
+    - name: Set output facts for workflow
       ansible.builtin.set_fact:
         lb_output:
           name: "{{ lb_data.name }}"
@@ -96,11 +95,10 @@
           vip_address: "{{ lb_data.vip_address }}"
           id: "{{ lb_data.id }}"
 
-    - name: Mostra riepilogo del Load Balancer
+    - name: Print LB info for workflow output
       ansible.builtin.debug:
         msg:
           - "✅ Load Balancer creato con successo!"
-          - "Tenant: {{ tenant_name }}"
           - "Nome: {{ lb_output.name }}"
           - "VIP Address: {{ lb_output.vip_address }}"
           - "VIP Port ID: {{ lb_output.vip_port_id }}"
