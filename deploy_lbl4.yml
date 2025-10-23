@@ -59,36 +59,16 @@
         wait: yes
         timeout: 120
 
-    - name: Add members to pool with retry on conflict
-      vars:
-        max_retries: 10
-        wait_seconds: 15
+    - name: Add members to pool
+      openstack.cloud.lb_member:
+        cloud: "{{ cloud_name }}"
+        pool: "{{ pool_name }}"
+        name: "member-{{ item.address }}-{{ item.protocol_port }}"
+        address: "{{ item.address }}"
+        protocol_port: "{{ item.protocol_port }}"
+        subnet_id: "{{ lb_vip_subnet }}"
+        state: present
       loop: "{{ lb_members }}"
-      loop_control:
-        loop_var: member
-      retries: "{{ max_retries }}"
-      delay: "{{ wait_seconds }}"
-      until: member_add_result is succeeded
-      register: member_add_result
-      block:
-        - name: Try to add member
-          openstack.cloud.lb_member:
-            cloud: "{{ cloud_name }}"
-            pool: "{{ pool_name }}"
-            name: "member-{{ member.address }}-{{ member.protocol_port }}"
-            address: "{{ member.address }}"
-            protocol_port: "{{ member.protocol_port }}"
-            subnet_id: "{{ lb_vip_subnet }}"
-            state: present
-          register: member_add_result
-          failed_when: >
-            member_add_result.failed and
-            ('immutable' not in (member_add_result.msg | default('')))
-
-        - name: Wait between retries
-          ansible.builtin.pause:
-            seconds: "{{ wait_seconds }}"
-          when: member_add_result.failed
 
     - name: Retrieve Load Balancer info using OpenStack SDK (no CLI)
       ansible.builtin.command: >
