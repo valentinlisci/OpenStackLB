@@ -1,177 +1,246 @@
 ---
-- name: Create L4 TCP Load Balancer (Dynamic - Fixed)
+- name: Create L4 TCP Load Balancer (Dynamic - Fixed) with AWX Notifications
   hosts: localhost
   gather_facts: no
   collections:
     - openstack.cloud
-  
+
   vars:
-    protocol: "{{ protocol | default('TCP') }}"
-    lb_algorithm_default: "{{ lb_algorithm | default('ROUND_ROBIN') }}"
-    listener_name: "{{ lb_name }}-listener"
-    pool_name: "{{ lb_name }}-pool"
-  
+    cloud_name: openstack
+    lb_name: awx-test-lb-l4-corretto
+    lb_vip_subnet: "d126b00a-8fab-48b4-bc55-0f05c6aacc8e"
+    listener_name: tcp-listener
+    listener_port: 8080
+    pool_name: tcp-pool
+    lb_algorithm: ROUND_ROBIN
+    protocol: TCP
+    lb_members:
+      - address: 10.0.0.11
+        protocol_port: 8080
+      - address: 10.0.0.12
+        protocol_port: 8080
+
   tasks:
-    - name: Validate required variables
+
+    - name: 🔔 Notify - Job started
+      uri:
+        url: "{{ tower_host }}/api/v2/job_events/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          event: "notice"
+          stdout: "🚀 Job started: Load Balancer creation initiated."
+        status_code: 201,202
+      ignore_errors: yes
+
+    - name: 🔍 Validate required variables
       assert:
         that:
           - lb_name is defined
-          - lb_name | length > 0
           - lb_vip_subnet is defined
           - listener_port is defined
-          - listener_port | int > 0
-          - listener_port | int < 65536
           - lb_members is defined
           - lb_members | length > 0
         fail_msg: "❌ Variabili richieste mancanti!"
-    
-    - name: Log configuration
+      tags: validation
+
+    - name: 🧾 Log configuration
       debug:
         msg: |
-          📋 Configurazione Load Balancer:
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          Nome: {{ lb_name }}
-          Subnet VIP: {{ lb_vip_subnet }}
-          Porta: {{ listener_port }}
-          Protocollo: {{ protocol }}
-          Algoritmo: {{ lb_algorithm_default }}
-          Membri: {{ lb_members | length }} server(s)
-    
-    # Cleanup opzionale
-    - name: Ensure no existing load balancer (cleanup)
+          📋 Configurazione Load Balancer
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          🌐 Cloud: {{ cloud_name }}
+          📛 Nome: {{ lb_name }}
+          🧩 Subnet VIP: {{ lb_vip_subnet }}
+          ⚙️  Algoritmo: {{ lb_algorithm }}
+          🔌 Porta: {{ listener_port }}
+          🖥️  Membri: {{ lb_members | length }}
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    - name: 🔔 Notify - Cleanup start
+      uri:
+        url: "{{ tower_host }}/api/v2/job_events/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          event: "notice"
+          stdout: "🧹 Cleanup existing Load Balancer if present..."
+        status_code: 201,202
+      ignore_errors: yes
+
+    - name: 🧹 Ensure no existing load balancer (cleanup)
       openstack.cloud.loadbalancer:
+        cloud: "{{ cloud_name }}"
         name: "{{ lb_name }}"
         state: absent
         wait: yes
         timeout: 300
       ignore_errors: yes
-    
-    # ✅ Crea Load Balancer (SENZA provider!)
-    - name: Create Load Balancer
+
+    - name: 🏗️ Create Load Balancer
       openstack.cloud.loadbalancer:
+        cloud: "{{ cloud_name }}"
         name: "{{ lb_name }}"
         vip_subnet: "{{ lb_vip_subnet }}"
         state: present
         wait: yes
         timeout: 800
       register: lb_created
-    
-    # DEBUG: Mostra la struttura completa
-    - name: Debug - Show complete LB structure
-      debug:
-        msg: "LB Created Result: {{ lb_created }}"
-    
-    # Salva VIP in modo SICURO
-    - name: Save LB VIP info (safe access)
-      set_fact:
-        lb_vip_address: "{{ lb_created.loadbalancer.vip_address | default(lb_created.vip_address | default('N/A')) }}"
-        lb_vip_port_id: "{{ lb_created.loadbalancer.vip_port_id | default(lb_created.vip_port_id | default('N/A')) }}"
-        lb_id: "{{ lb_created.loadbalancer.id | default(lb_created.id | default('N/A')) }}"
-    
-    - name: Log LB creation success
-      debug:
-        msg: "✅ Load Balancer '{{ lb_name }}' creato! VIP: {{ lb_vip_address }}"
-    
-    # Crea Listener
-    - name: Create Listener
+
+    - name: 🔔 Notify - LB created
+      uri:
+        url: "{{ tower_host }}/api/v2/job_events/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          event: "notice"
+          stdout: "✅ Load Balancer '{{ lb_name }}' creato con successo."
+        status_code: 201,202
+      ignore_errors: yes
+
+    - name: 🎧 Create Listener
       openstack.cloud.lb_listener:
+        cloud: "{{ cloud_name }}"
         load_balancer: "{{ lb_name }}"
         name: "{{ listener_name }}"
-        protocol: "{{ protocol | upper }}"
-        protocol_port: "{{ listener_port | int }}"
+        protocol: "{{ protocol }}"
+        protocol_port: "{{ listener_port }}"
         state: present
         wait: yes
         timeout: 120
       register: listener_created
-    
-    - name: Log Listener creation
-      debug:
-        msg: "✅ Listener '{{ listener_name }}' creato sulla porta {{ listener_port }}"
-    
-    # Crea Pool
-    - name: Create Pool
+
+    - name: 🔔 Notify - Listener created
+      uri:
+        url: "{{ tower_host }}/api/v2/job_events/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          event: "notice"
+          stdout: "✅ Listener '{{ listener_name }}' creato sulla porta {{ listener_port }}."
+        status_code: 201,202
+      ignore_errors: yes
+
+    - name: 🧩 Create Pool
       openstack.cloud.lb_pool:
+        cloud: "{{ cloud_name }}"
         listener: "{{ listener_name }}"
         name: "{{ pool_name }}"
-        protocol: "{{ protocol | upper }}"
-        lb_algorithm: "{{ lb_algorithm_default }}"
+        protocol: "{{ protocol }}"
+        lb_algorithm: "{{ lb_algorithm }}"
         state: present
         wait: yes
         timeout: 120
       register: pool_created
-    
-    - name: Log Pool creation
-      debug:
-        msg: "✅ Pool '{{ pool_name }}' creato con algoritmo {{ lb_algorithm_default }}"
-    
-    # Aggiungi membri
-    - name: Add members to pool
+
+    - name: 🔔 Notify - Pool created
+      uri:
+        url: "{{ tower_host }}/api/v2/job_events/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          event: "notice"
+          stdout: "✅ Pool '{{ pool_name }}' creato con algoritmo {{ lb_algorithm }}."
+        status_code: 201,202
+      ignore_errors: yes
+
+    - name: 🧱 Add members to pool
       openstack.cloud.lb_member:
+        cloud: "{{ cloud_name }}"
         pool: "{{ pool_name }}"
         name: "member-{{ item.address }}-{{ item.protocol_port }}"
         address: "{{ item.address }}"
-        protocol_port: "{{ item.protocol_port | int }}"
+        protocol_port: "{{ item.protocol_port }}"
         subnet_id: "{{ lb_vip_subnet }}"
         state: present
         wait: yes
       loop: "{{ lb_members }}"
       register: members_added
-    
-    - name: Log members added
-      debug:
-        msg: "✅ Aggiunti {{ lb_members | length }} membri al pool"
-    
-    # Gestione Floating IP (opzionale)
-    - name: Floating IP management
-      when: 
-        - assign_floating_ip | default(false) | bool
-        - lb_vip_port_id is defined
-        - lb_vip_port_id != 'N/A'
-      block:
-        - name: Create Floating IP
-          openstack.cloud.floating_ip:
-            network: "{{ floating_ip_network | default('external_pub_vlan20') }}"
-            state: present
-          register: fip_created
-        
-        - name: Attach Floating IP to LB VIP port
-          openstack.cloud.floating_ip:
-            floating_ip_address: "{{ fip_created.floating_ip.floating_ip_address }}"
-            port: "{{ lb_vip_port_id }}"
-            state: present
-          register: fip_attached
-        
-        - name: Show summary with Floating IP
-          debug:
-            msg: |
-              ✅✅✅ LOAD BALANCER COMPLETATO ✅✅✅
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              📛 Nome: {{ lb_name }}
-              🆔 ID: {{ lb_id }}
-              🔒 VIP Interno: {{ lb_vip_address }}
-              🌐 Floating IP: {{ fip_created.floating_ip.floating_ip_address }}
-              🚪 Porta: {{ listener_port }}
-              🖥️  Backend Servers:
-              {% for member in lb_members %}
-                  - {{ member.address }}:{{ member.protocol_port }}
-              {% endfor %}
-              ⚖️  Algoritmo: {{ lb_algorithm_default }}
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    
-    # Summary senza Floating IP
-    - name: Show summary without Floating IP
-      when: not (assign_floating_ip | default(false) | bool)
-      debug:
+
+    - name: 🔔 Notify - Members added
+      uri:
+        url: "{{ tower_host }}/api/v2/job_events/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          event: "notice"
+          stdout: "✅ Aggiunti {{ lb_members | length }} membri al pool '{{ pool_name }}'."
+        status_code: 201,202
+      ignore_errors: yes
+
+    - name: 🔎 Retrieve Load Balancer info (OpenStack SDK)
+      ansible.builtin.command: >
+        python3 -c "import openstack, json;
+        conn=openstack.connect(cloud='{{ cloud_name }}');
+        lb=conn.load_balancer.find_load_balancer('{{ lb_name }}');
+        import sys;
+        sys.exit(1) if not lb else None;
+        full=conn.load_balancer.get_load_balancer(lb);
+        print(json.dumps({'name': full.name, 'vip_address': full.vip_address, 'vip_port_id': full.vip_port_id, 'id': full.id}))"
+      register: lb_info_json
+      changed_when: false
+      failed_when: lb_info_json.rc != 0
+
+    - name: Parse SDK output
+      ansible.builtin.set_fact:
+        lb_data: "{{ lb_info_json.stdout | from_json }}"
+
+    - name: 📦 Set output facts for workflow
+      ansible.builtin.set_fact:
+        lb_output:
+          name: "{{ lb_data.name }}"
+          vip_port_id: "{{ lb_data.vip_port_id }}"
+          vip_address: "{{ lb_data.vip_address }}"
+          id: "{{ lb_data.id }}"
+
+    - name: 🔔 Notify - Job completed
+      uri:
+        url: "{{ tower_host }}/api/v2/job_events/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          event: "notice"
+          stdout: |
+            🎯 Job completed successfully!
+            Load Balancer '{{ lb_output.name }}' attivo su {{ lb_output.vip_address }}
+        status_code: 201,202
+      ignore_errors: yes
+
+    - name: 📜 Final summary
+      ansible.builtin.debug:
         msg: |
-          ✅✅✅ LOAD BALANCER COMPLETATO ✅✅✅
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          📛 Nome: {{ lb_name }}
-          🆔 ID: {{ lb_id }}
-          🔒 VIP Interno: {{ lb_vip_address }}
-          🚪 Porta: {{ listener_port }}
-          🖥️  Backend Servers:
+          ✅✅✅ CREAZIONE LOAD BALANCER COMPLETATA ✅✅✅
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          📛 Nome: {{ lb_output.name }}
+          🆔 ID: {{ lb_output.id }}
+          🔒 VIP Address: {{ lb_output.vip_address }}
+          🔌 VIP Port ID: {{ lb_output.vip_port_id }}
+          🎧 Listener: {{ listener_name }}
+          🧩 Pool: {{ pool_name }}
+          🖥️  Backend Members:
           {% for member in lb_members %}
               - {{ member.address }}:{{ member.protocol_port }}
           {% endfor %}
-          ⚖️  Algoritmo: {{ lb_algorithm_default }}
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          ⚖️  Algoritmo: {{ lb_algorithm }}
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
