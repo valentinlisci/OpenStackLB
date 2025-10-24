@@ -6,6 +6,7 @@
     - openstack.cloud
 
   vars:
+    notification_template_id: 1
     cloud_name: openstack
     lb_name: awx-test-lb-l4-corretto
     lb_vip_subnet: "d126b00a-8fab-48b4-bc55-0f05c6aacc8e"
