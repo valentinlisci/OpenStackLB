@@ -25,18 +25,12 @@
 
     - name: 🔔 Notify - Job started
       uri:
-        url: "{{ tower_host }}/api/v2/notifications/"
+        url: "{{ tower_host }}/api/v2/notification_templates/{{ notification_template_id }}/trigger/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
-        body_format: json
-        body:
-          notification_type: "custom"
-          message: "🚀 Job started: Load Balancer creation initiated."
-          notification_configuration:
-            body: "Inizio creazione Load Balancer '{{ lb_name }}'"
-        status_code: 201,202
+        status_code: 204
       ignore_errors: yes
 
     - name: 🔍 Validate required variables
@@ -65,18 +59,12 @@
 
     - name: 🔔 Notify - Cleanup start
       uri:
-        url: "{{ tower_host }}/api/v2/notifications/"
+        url: "{{ tower_host }}/api/v2/notification_templates/{{ notification_template_id }}/trigger/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
-        body_format: json
-        body:
-          notification_type: "custom"
-          message: "🧹 Cleanup existing Load Balancer if present..."
-          notification_configuration:
-            body: "Eliminazione LB precedente '{{ lb_name }}' (se esiste)"
-        status_code: 201,202
+        status_code: 204
       ignore_errors: yes
 
     - name: 🧹 Ensure no existing load balancer (cleanup)
@@ -100,18 +88,12 @@
 
     - name: 🔔 Notify - LB created
       uri:
-        url: "{{ tower_host }}/api/v2/notifications/"
+        url: "{{ tower_host }}/api/v2/notification_templates/{{ notification_template_id }}/trigger/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
-        body_format: json
-        body:
-          notification_type: "custom"
-          message: "✅ Load Balancer '{{ lb_name }}' creato con successo."
-          notification_configuration:
-            body: "Load Balancer '{{ lb_name }}' creato correttamente"
-        status_code: 201,202
+        status_code: 204
       ignore_errors: yes
 
     - name: 🎧 Create Listener
@@ -128,18 +110,12 @@
 
     - name: 🔔 Notify - Listener created
       uri:
-        url: "{{ tower_host }}/api/v2/notifications/"
+        url: "{{ tower_host }}/api/v2/notification_templates/{{ notification_template_id }}/trigger/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
-        body_format: json
-        body:
-          notification_type: "custom"
-          message: "✅ Listener '{{ listener_name }}' creato sulla porta {{ listener_port }}."
-          notification_configuration:
-            body: "Listener creato sulla porta {{ listener_port }}"
-        status_code: 201,202
+        status_code: 204
       ignore_errors: yes
 
     - name: 🧩 Create Pool
@@ -156,18 +132,12 @@
 
     - name: 🔔 Notify - Pool created
       uri:
-        url: "{{ tower_host }}/api/v2/notifications/"
+        url: "{{ tower_host }}/api/v2/notification_templates/{{ notification_template_id }}/trigger/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
-        body_format: json
-        body:
-          notification_type: "custom"
-          message: "✅ Pool '{{ pool_name }}' creato con algoritmo {{ lb_algorithm }}."
-          notification_configuration:
-            body: "Pool '{{ pool_name }}' creato con algoritmo {{ lb_algorithm }}"
-        status_code: 201,202
+        status_code: 204
       ignore_errors: yes
 
     - name: 🧱 Add members to pool
@@ -185,18 +155,12 @@
 
     - name: 🔔 Notify - Members added
       uri:
-        url: "{{ tower_host }}/api/v2/notifications/"
+        url: "{{ tower_host }}/api/v2/notification_templates/{{ notification_template_id }}/trigger/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
-        body_format: json
-        body:
-          notification_type: "custom"
-          message: "✅ Aggiunti {{ lb_members | length }} membri al pool '{{ pool_name }}'."
-          notification_configuration:
-            body: "Aggiunti {{ lb_members | length }} membri al pool '{{ pool_name }}'"
-        status_code: 201,202
+        status_code: 204
       ignore_errors: yes
 
     - name: 🔎 Retrieve Load Balancer info (OpenStack SDK)
@@ -226,24 +190,16 @@
 
     - name: 🔔 Notify - Job completed
       uri:
-        url: "{{ tower_host }}/api/v2/notifications/"
+        url: "{{ tower_host }}/api/v2/notification_templates/{{ notification_template_id }}/trigger/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
-        body_format: json
-        body:
-          notification_type: "custom"
-          message: |
-            🎯 Job completed successfully!
-            Load Balancer '{{ lb_output.name }}' attivo su {{ lb_output.vip_address }}
-          notification_configuration:
-            body: "Job completato con successo per LB '{{ lb_output.name }}'"
-        status_code: 201,202
+        status_code: 204
       ignore_errors: yes
 
     - name: 📜 Final summary
-      ansible.builtin.debug:
+      debug:
         msg: |
           ✅✅✅ CREAZIONE LOAD BALANCER COMPLETATA ✅✅✅
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
