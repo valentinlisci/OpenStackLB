@@ -6,7 +6,6 @@
     - openstack.cloud
 
   vars:
-    notification_template_id: 1
     cloud_name: openstack
     lb_name: awx-test-lb-l4-corretto
     lb_vip_subnet: "d126b00a-8fab-48b4-bc55-0f05c6aacc8e"
@@ -25,12 +24,18 @@
 
     - name: 🔔 Notify - Job started
       uri:
-        url: "{{ tower_host }}/api/v2/notification_templates/{{ notification_template_id }}/trigger/"
+        url: "{{ tower_host }}/api/v2/activity_stream/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
-        status_code: 204
+        body_format: json
+        body:
+          operation: "create"
+          object1: "Job"
+          object2: "{{ lb_name }}"
+          changes: "🚀 Job started: creating Load Balancer '{{ lb_name }}'"
+        status_code: 201
       ignore_errors: yes
 
     - name: 🔍 Validate required variables
@@ -42,7 +47,6 @@
           - lb_members is defined
           - lb_members | length > 0
         fail_msg: "❌ Variabili richieste mancanti!"
-      tags: validation
 
     - name: 🧾 Log configuration
       debug:
@@ -59,12 +63,18 @@
 
     - name: 🔔 Notify - Cleanup start
       uri:
-        url: "{{ tower_host }}/api/v2/notification_templates/{{ notification_template_id }}/trigger/"
+        url: "{{ tower_host }}/api/v2/activity_stream/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
-        status_code: 204
+        body_format: json
+        body:
+          operation: "update"
+          object1: "Cleanup"
+          object2: "{{ lb_name }}"
+          changes: "🧹 Checking for existing Load Balancer '{{ lb_name }}'"
+        status_code: 201
       ignore_errors: yes
 
     - name: 🧹 Ensure no existing load balancer (cleanup)
@@ -88,12 +98,18 @@
 
     - name: 🔔 Notify - LB created
       uri:
-        url: "{{ tower_host }}/api/v2/notification_templates/{{ notification_template_id }}/trigger/"
+        url: "{{ tower_host }}/api/v2/activity_stream/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
-        status_code: 204
+        body_format: json
+        body:
+          operation: "create"
+          object1: "LoadBalancer"
+          object2: "{{ lb_name }}"
+          changes: "✅ Load Balancer '{{ lb_name }}' creato con successo"
+        status_code: 201
       ignore_errors: yes
 
     - name: 🎧 Create Listener
@@ -110,12 +126,18 @@
 
     - name: 🔔 Notify - Listener created
       uri:
-        url: "{{ tower_host }}/api/v2/notification_templates/{{ notification_template_id }}/trigger/"
+        url: "{{ tower_host }}/api/v2/activity_stream/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
-        status_code: 204
+        body_format: json
+        body:
+          operation: "create"
+          object1: "Listener"
+          object2: "{{ listener_name }}"
+          changes: "✅ Listener '{{ listener_name }}' creato sulla porta {{ listener_port }}"
+        status_code: 201
       ignore_errors: yes
 
     - name: 🧩 Create Pool
@@ -132,12 +154,18 @@
 
     - name: 🔔 Notify - Pool created
       uri:
-        url: "{{ tower_host }}/api/v2/notification_templates/{{ notification_template_id }}/trigger/"
+        url: "{{ tower_host }}/api/v2/activity_stream/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
-        status_code: 204
+        body_format: json
+        body:
+          operation: "create"
+          object1: "Pool"
+          object2: "{{ pool_name }}"
+          changes: "✅ Pool '{{ pool_name }}' creato con algoritmo {{ lb_algorithm }}"
+        status_code: 201
       ignore_errors: yes
 
     - name: 🧱 Add members to pool
@@ -155,12 +183,18 @@
 
     - name: 🔔 Notify - Members added
       uri:
-        url: "{{ tower_host }}/api/v2/notification_templates/{{ notification_template_id }}/trigger/"
+        url: "{{ tower_host }}/api/v2/activity_stream/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
-        status_code: 204
+        body_format: json
+        body:
+          operation: "update"
+          object1: "PoolMembers"
+          object2: "{{ pool_name }}"
+          changes: "✅ Aggiunti {{ lb_members | length }} membri al pool '{{ pool_name }}'"
+        status_code: 201
       ignore_errors: yes
 
     - name: 🔎 Retrieve Load Balancer info (OpenStack SDK)
@@ -190,12 +224,18 @@
 
     - name: 🔔 Notify - Job completed
       uri:
-        url: "{{ tower_host }}/api/v2/notification_templates/{{ notification_template_id }}/trigger/"
+        url: "{{ tower_host }}/api/v2/activity_stream/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
-        status_code: 204
+        body_format: json
+        body:
+          operation: "complete"
+          object1: "Job"
+          object2: "{{ lb_output.name }}"
+          changes: "🎯 Job completato con successo. Load Balancer attivo su {{ lb_output.vip_address }}"
+        status_code: 201
       ignore_errors: yes
 
     - name: 📜 Final summary
