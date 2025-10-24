@@ -1,0 +1,218 @@
+---
+- name: Create L4 TCP Load Balancer with AWX Notifications (stable version)
+  hosts: localhost
+  gather_facts: no
+  collections:
+    - openstack.cloud
+
+  vars:
+    tower_host: "https://services.xaaslab.it"
+    tower_token: "{{ lookup('env', 'TOWER_TOKEN') }}"
+    cloud_name: openstack
+    lb_name: awx-test-lb-l4-corretto
+    lb_vip_subnet: "d126b00a-8fab-48b4-bc55-0f05c6aacc8e"
+    listener_name: tcp-listener
+    listener_port: 8080
+    pool_name: tcp-pool
+    lb_algorithm: ROUND_ROBIN
+    lb_members:
+      - address: 10.0.0.11
+        protocol_port: 8080
+      - address: 10.0.0.12
+        protocol_port: 8080
+
+  tasks:
+
+    - name: 🔔 Notify - Job started
+      uri:
+        url: "{{ tower_host }}/api/v2/activity_stream/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          operation: "create"
+          object1: "Job"
+          object2: "{{ lb_name }}"
+          changes: "🚀 Job started: creazione del Load Balancer '{{ lb_name }}' iniziata."
+        status_code: 201
+      ignore_errors: yes
+
+    - name: Ensure no existing load balancer (cleanup)
+      openstack.cloud.loadbalancer:
+        cloud: "{{ cloud_name }}"
+        name: "{{ lb_name }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: 🔔 Notify - Cleanup done
+      uri:
+        url: "{{ tower_host }}/api/v2/activity_stream/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          operation: "update"
+          object1: "Cleanup"
+          object2: "{{ lb_name }}"
+          changes: "🧹 Verifica e rimozione di un LB precedente completata."
+        status_code: 201
+      ignore_errors: yes
+
+    - name: Create Load Balancer (Amphora provider assumed)
+      openstack.cloud.loadbalancer:
+        cloud: "{{ cloud_name }}"
+        name: "{{ lb_name }}"
+        vip_subnet: "{{ lb_vip_subnet }}"
+        state: present
+        wait: yes
+        timeout: 800
+
+    - name: 🔔 Notify - Load Balancer created
+      uri:
+        url: "{{ tower_host }}/api/v2/activity_stream/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          operation: "create"
+          object1: "LoadBalancer"
+          object2: "{{ lb_name }}"
+          changes: "✅ Load Balancer '{{ lb_name }}' creato con successo."
+        status_code: 201
+      ignore_errors: yes
+
+    - name: Create TCP Listener
+      openstack.cloud.lb_listener:
+        cloud: "{{ cloud_name }}"
+        load_balancer: "{{ lb_name }}"
+        name: "{{ listener_name }}"
+        protocol: TCP
+        protocol_port: "{{ listener_port }}"
+        state: present
+        wait: yes
+        timeout: 120
+
+    - name: 🔔 Notify - Listener created
+      uri:
+        url: "{{ tower_host }}/api/v2/activity_stream/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          operation: "create"
+          object1: "Listener"
+          object2: "{{ listener_name }}"
+          changes: "✅ Listener '{{ listener_name }}' creato sulla porta {{ listener_port }}."
+        status_code: 201
+      ignore_errors: yes
+
+    - name: Create TCP Pool
+      openstack.cloud.lb_pool:
+        cloud: "{{ cloud_name }}"
+        listener: "{{ listener_name }}"
+        name: "{{ pool_name }}"
+        protocol: TCP
+        lb_algorithm: "{{ lb_algorithm }}"
+        state: present
+        wait: yes
+        timeout: 120
+
+    - name: 🔔 Notify - Pool created
+      uri:
+        url: "{{ tower_host }}/api/v2/activity_stream/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          operation: "create"
+          object1: "Pool"
+          object2: "{{ pool_name }}"
+          changes: "✅ Pool '{{ pool_name }}' creato con algoritmo {{ lb_algorithm }}."
+        status_code: 201
+      ignore_errors: yes
+
+    - name: Add members to pool
+      openstack.cloud.lb_member:
+        cloud: "{{ cloud_name }}"
+        pool: "{{ pool_name }}"
+        name: "member-{{ item.address }}-{{ item.protocol_port }}"
+        address: "{{ item.address }}"
+        protocol_port: "{{ item.protocol_port }}"
+        subnet_id: "{{ lb_vip_subnet }}"
+        state: present
+      loop: "{{ lb_members }}"
+
+    - name: 🔔 Notify - Members added
+      uri:
+        url: "{{ tower_host }}/api/v2/activity_stream/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          operation: "update"
+          object1: "PoolMembers"
+          object2: "{{ pool_name }}"
+          changes: "✅ Aggiunti {{ lb_members | length }} membri al pool '{{ pool_name }}'."
+        status_code: 201
+      ignore_errors: yes
+
+    - name: Retrieve Load Balancer info using OpenStack SDK (no CLI)
+      ansible.builtin.command: >
+        python3 -c "import openstack, json;
+        conn=openstack.connect(cloud='{{ cloud_name }}');
+        lb=conn.load_balancer.find_load_balancer('{{ lb_name }}');
+        import sys;
+        sys.exit(1) if not lb else None;
+        full=conn.load_balancer.get_load_balancer(lb);
+        print(json.dumps({'name': full.name, 'vip_address': full.vip_address, 'vip_port_id': full.vip_port_id, 'id': full.id}))"
+      register: lb_info_json
+      changed_when: false
+      failed_when: lb_info_json.rc != 0
+
+    - name: Parse SDK output
+      ansible.builtin.set_fact:
+        lb_data: "{{ lb_info_json.stdout | from_json }}"
+
+    - name: Set output facts for workflow
+      ansible.builtin.set_fact:
+        lb_output:
+          name: "{{ lb_data.name }}"
+          vip_port_id: "{{ lb_data.vip_port_id }}"
+          vip_address: "{{ lb_data.vip_address }}"
+          id: "{{ lb_data.id }}"
+
+    - name: 🔔 Notify - Job completed
+      uri:
+        url: "{{ tower_host }}/api/v2/activity_stream/"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ tower_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          operation: "complete"
+          object1: "Job"
+          object2: "{{ lb_output.name }}"
+          changes: "🎯 Job completato con successo. LB attivo su {{ lb_output.vip_address }}"
+        status_code: 201
+      ignore_errors: yes
+
+    - name: Print LB info for workflow output
+      debug:
+        msg:
+          - "✅ Load Balancer creato con successo!"
+          - "Nome: {{ lb_output.name }}"
+          - "VIP Address: {{ lb_output.vip_address }}"
+          - "VIP Port ID: {{ lb_output.vip_port_id }}"
