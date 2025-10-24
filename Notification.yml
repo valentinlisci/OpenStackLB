@@ -1,17 +1,17 @@
 ---
-name: Create L4 TCP Load Balancer (Dynamic - Fixed)
-hosts: localhost
-gather_facts: no
-collections:
-  - openstack.cloud
+- name: Create L4 TCP Load Balancer (Dynamic - Fixed)
+  hosts: localhost
+  gather_facts: no
+  collections:
+    - openstack.cloud
   
-vars:
+  vars:
     protocol: "{{ protocol | default('TCP') }}"
     lb_algorithm_default: "{{ lb_algorithm | default('ROUND_ROBIN') }}"
     listener_name: "{{ lb_name }}-listener"
     pool_name: "{{ lb_name }}-pool"
   
-tasks:
+  tasks:
     - name: Validate required variables
       assert:
         that:
