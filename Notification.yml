@@ -1,0 +1,177 @@
+---
+name: Create L4 TCP Load Balancer (Dynamic - Fixed)
+hosts: localhost
+gather_facts: no
+collections:
+  - openstack.cloud
+  
+vars:
+    protocol: "{{ protocol | default('TCP') }}"
+    lb_algorithm_default: "{{ lb_algorithm | default('ROUND_ROBIN') }}"
+    listener_name: "{{ lb_name }}-listener"
+    pool_name: "{{ lb_name }}-pool"
+  
+tasks:
+    - name: Validate required variables
+      assert:
+        that:
+          - lb_name is defined
+          - lb_name | length > 0
+          - lb_vip_subnet is defined
+          - listener_port is defined
+          - listener_port | int > 0
+          - listener_port | int < 65536
+          - lb_members is defined
+          - lb_members | length > 0
+        fail_msg: "❌ Variabili richieste mancanti!"
+    
+    - name: Log configuration
+      debug:
+        msg: |
+          📋 Configurazione Load Balancer:
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          Nome: {{ lb_name }}
+          Subnet VIP: {{ lb_vip_subnet }}
+          Porta: {{ listener_port }}
+          Protocollo: {{ protocol }}
+          Algoritmo: {{ lb_algorithm_default }}
+          Membri: {{ lb_members | length }} server(s)
+    
+    # Cleanup opzionale
+    - name: Ensure no existing load balancer (cleanup)
+      openstack.cloud.loadbalancer:
+        name: "{{ lb_name }}"
+        state: absent
+        wait: yes
+        timeout: 300
+      ignore_errors: yes
+    
+    # ✅ Crea Load Balancer (SENZA provider!)
+    - name: Create Load Balancer
+      openstack.cloud.loadbalancer:
+        name: "{{ lb_name }}"
+        vip_subnet: "{{ lb_vip_subnet }}"
+        state: present
+        wait: yes
+        timeout: 800
+      register: lb_created
+    
+    # DEBUG: Mostra la struttura completa
+    - name: Debug - Show complete LB structure
+      debug:
+        msg: "LB Created Result: {{ lb_created }}"
+    
+    # Salva VIP in modo SICURO
+    - name: Save LB VIP info (safe access)
+      set_fact:
+        lb_vip_address: "{{ lb_created.loadbalancer.vip_address | default(lb_created.vip_address | default('N/A')) }}"
+        lb_vip_port_id: "{{ lb_created.loadbalancer.vip_port_id | default(lb_created.vip_port_id | default('N/A')) }}"
+        lb_id: "{{ lb_created.loadbalancer.id | default(lb_created.id | default('N/A')) }}"
+    
+    - name: Log LB creation success
+      debug:
+        msg: "✅ Load Balancer '{{ lb_name }}' creato! VIP: {{ lb_vip_address }}"
+    
+    # Crea Listener
+    - name: Create Listener
+      openstack.cloud.lb_listener:
+        load_balancer: "{{ lb_name }}"
+        name: "{{ listener_name }}"
+        protocol: "{{ protocol | upper }}"
+        protocol_port: "{{ listener_port | int }}"
+        state: present
+        wait: yes
+        timeout: 120
+      register: listener_created
+    
+    - name: Log Listener creation
+      debug:
+        msg: "✅ Listener '{{ listener_name }}' creato sulla porta {{ listener_port }}"
+    
+    # Crea Pool
+    - name: Create Pool
+      openstack.cloud.lb_pool:
+        listener: "{{ listener_name }}"
+        name: "{{ pool_name }}"
+        protocol: "{{ protocol | upper }}"
+        lb_algorithm: "{{ lb_algorithm_default }}"
+        state: present
+        wait: yes
+        timeout: 120
+      register: pool_created
+    
+    - name: Log Pool creation
+      debug:
+        msg: "✅ Pool '{{ pool_name }}' creato con algoritmo {{ lb_algorithm_default }}"
+    
+    # Aggiungi membri
+    - name: Add members to pool
+      openstack.cloud.lb_member:
+        pool: "{{ pool_name }}"
+        name: "member-{{ item.address }}-{{ item.protocol_port }}"
+        address: "{{ item.address }}"
+        protocol_port: "{{ item.protocol_port | int }}"
+        subnet_id: "{{ lb_vip_subnet }}"
+        state: present
+        wait: yes
+      loop: "{{ lb_members }}"
+      register: members_added
+    
+    - name: Log members added
+      debug:
+        msg: "✅ Aggiunti {{ lb_members | length }} membri al pool"
+    
+    # Gestione Floating IP (opzionale)
+    - name: Floating IP management
+      when: 
+        - assign_floating_ip | default(false) | bool
+        - lb_vip_port_id is defined
+        - lb_vip_port_id != 'N/A'
+      block:
+        - name: Create Floating IP
+          openstack.cloud.floating_ip:
+            network: "{{ floating_ip_network | default('external_pub_vlan20') }}"
+            state: present
+          register: fip_created
+        
+        - name: Attach Floating IP to LB VIP port
+          openstack.cloud.floating_ip:
+            floating_ip_address: "{{ fip_created.floating_ip.floating_ip_address }}"
+            port: "{{ lb_vip_port_id }}"
+            state: present
+          register: fip_attached
+        
+        - name: Show summary with Floating IP
+          debug:
+            msg: |
+              ✅✅✅ LOAD BALANCER COMPLETATO ✅✅✅
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              📛 Nome: {{ lb_name }}
+              🆔 ID: {{ lb_id }}
+              🔒 VIP Interno: {{ lb_vip_address }}
+              🌐 Floating IP: {{ fip_created.floating_ip.floating_ip_address }}
+              🚪 Porta: {{ listener_port }}
+              🖥️  Backend Servers:
+              {% for member in lb_members %}
+                  - {{ member.address }}:{{ member.protocol_port }}
+              {% endfor %}
+              ⚖️  Algoritmo: {{ lb_algorithm_default }}
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    
+    # Summary senza Floating IP
+    - name: Show summary without Floating IP
+      when: not (assign_floating_ip | default(false) | bool)
+      debug:
+        msg: |
+          ✅✅✅ LOAD BALANCER COMPLETATO ✅✅✅
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          📛 Nome: {{ lb_name }}
+          🆔 ID: {{ lb_id }}
+          🔒 VIP Interno: {{ lb_vip_address }}
+          🚪 Porta: {{ listener_port }}
+          🖥️  Backend Servers:
+          {% for member in lb_members %}
+              - {{ member.address }}:{{ member.protocol_port }}
+          {% endfor %}
+          ⚖️  Algoritmo: {{ lb_algorithm_default }}
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
