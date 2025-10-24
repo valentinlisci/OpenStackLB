@@ -24,15 +24,17 @@
 
     - name: 🔔 Notify - Job started
       uri:
-        url: "{{ tower_host }}/api/v2/job_events/"
+        url: "{{ tower_host }}/api/v2/notifications/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
         body_format: json
         body:
-          event: "notice"
-          stdout: "🚀 Job started: Load Balancer creation initiated."
+          notification_type: "custom"
+          message: "🚀 Job started: Load Balancer creation initiated."
+          notification_configuration:
+            body: "Inizio creazione Load Balancer '{{ lb_name }}'"
         status_code: 201,202
       ignore_errors: yes
 
@@ -62,15 +64,17 @@
 
     - name: 🔔 Notify - Cleanup start
       uri:
-        url: "{{ tower_host }}/api/v2/job_events/"
+        url: "{{ tower_host }}/api/v2/notifications/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
         body_format: json
         body:
-          event: "notice"
-          stdout: "🧹 Cleanup existing Load Balancer if present..."
+          notification_type: "custom"
+          message: "🧹 Cleanup existing Load Balancer if present..."
+          notification_configuration:
+            body: "Eliminazione LB precedente '{{ lb_name }}' (se esiste)"
         status_code: 201,202
       ignore_errors: yes
 
@@ -95,15 +99,17 @@
 
     - name: 🔔 Notify - LB created
       uri:
-        url: "{{ tower_host }}/api/v2/job_events/"
+        url: "{{ tower_host }}/api/v2/notifications/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
         body_format: json
         body:
-          event: "notice"
-          stdout: "✅ Load Balancer '{{ lb_name }}' creato con successo."
+          notification_type: "custom"
+          message: "✅ Load Balancer '{{ lb_name }}' creato con successo."
+          notification_configuration:
+            body: "Load Balancer '{{ lb_name }}' creato correttamente"
         status_code: 201,202
       ignore_errors: yes
 
@@ -121,15 +127,17 @@
 
     - name: 🔔 Notify - Listener created
       uri:
-        url: "{{ tower_host }}/api/v2/job_events/"
+        url: "{{ tower_host }}/api/v2/notifications/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
         body_format: json
         body:
-          event: "notice"
-          stdout: "✅ Listener '{{ listener_name }}' creato sulla porta {{ listener_port }}."
+          notification_type: "custom"
+          message: "✅ Listener '{{ listener_name }}' creato sulla porta {{ listener_port }}."
+          notification_configuration:
+            body: "Listener creato sulla porta {{ listener_port }}"
         status_code: 201,202
       ignore_errors: yes
 
@@ -147,15 +155,17 @@
 
     - name: 🔔 Notify - Pool created
       uri:
-        url: "{{ tower_host }}/api/v2/job_events/"
+        url: "{{ tower_host }}/api/v2/notifications/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
         body_format: json
         body:
-          event: "notice"
-          stdout: "✅ Pool '{{ pool_name }}' creato con algoritmo {{ lb_algorithm }}."
+          notification_type: "custom"
+          message: "✅ Pool '{{ pool_name }}' creato con algoritmo {{ lb_algorithm }}."
+          notification_configuration:
+            body: "Pool '{{ pool_name }}' creato con algoritmo {{ lb_algorithm }}"
         status_code: 201,202
       ignore_errors: yes
 
@@ -174,15 +184,17 @@
 
     - name: 🔔 Notify - Members added
       uri:
-        url: "{{ tower_host }}/api/v2/job_events/"
+        url: "{{ tower_host }}/api/v2/notifications/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
         body_format: json
         body:
-          event: "notice"
-          stdout: "✅ Aggiunti {{ lb_members | length }} membri al pool '{{ pool_name }}'."
+          notification_type: "custom"
+          message: "✅ Aggiunti {{ lb_members | length }} membri al pool '{{ pool_name }}'."
+          notification_configuration:
+            body: "Aggiunti {{ lb_members | length }} membri al pool '{{ pool_name }}'"
         status_code: 201,202
       ignore_errors: yes
 
@@ -213,17 +225,19 @@
 
     - name: 🔔 Notify - Job completed
       uri:
-        url: "{{ tower_host }}/api/v2/job_events/"
+        url: "{{ tower_host }}/api/v2/notifications/"
         method: POST
         headers:
           Authorization: "Bearer {{ tower_token }}"
           Content-Type: "application/json"
         body_format: json
         body:
-          event: "notice"
-          stdout: |
+          notification_type: "custom"
+          message: |
             🎯 Job completed successfully!
             Load Balancer '{{ lb_output.name }}' attivo su {{ lb_output.vip_address }}
+          notification_configuration:
+            body: "Job completato con successo per LB '{{ lb_output.name }}'"
         status_code: 201,202
       ignore_errors: yes
 
