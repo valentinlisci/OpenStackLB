@@ -1,13 +1,11 @@
 ---
-- name: Create L4 TCP Load Balancer with AWX Notifications (stable version)
+- name: Create L4 TCP Load Balancer using openstack.cloud 2.4.1 
   hosts: localhost
   gather_facts: no
   collections:
     - openstack.cloud
 
   vars:
-    tower_host: "https://services.xaaslab.it"
-    tower_token: "{{ lookup('env', 'TOWER_TOKEN') }}"
     cloud_name: openstack
     lb_name: awx-test-lb-l4-corretto
     lb_vip_subnet: "d126b00a-8fab-48b4-bc55-0f05c6aacc8e"
@@ -23,22 +21,34 @@
 
   tasks:
 
-    - name: 🔔 Notify - Job started
+    # -------------------- NOTIFY: Job started --------------------
+    - name:  Notify ManageIQ - Job started
       uri:
-        url: "{{ tower_host }}/api/v2/activity_stream/"
+        url: "https://172.16.0.174/api/automation_requests"
         method: POST
-        headers:
-          Authorization: "Bearer {{ tower_token }}"
-          Content-Type: "application/json"
+        user: "admin"
+        password: "smartvm"
+        force_basic_auth: yes
+        validate_certs: no
         body_format: json
-        body:
-          operation: "create"
-          object1: "Job"
-          object2: "{{ lb_name }}"
-          changes: "🚀 Job started: creazione del Load Balancer '{{ lb_name }}' iniziata."
-        status_code: 201
+        body: |
+          {
+            "version": "1.1",
+            "uri_parts": {
+              "namespace": "Custom/System",
+              "class": "Request",
+              "instance": "test"
+            },
+            "parameters": {
+              "message": " Job AWX avviato: creazione Load Balancer {{ lb_name }}"
+            },
+            "requester": {
+              "auto_approve": true
+            }
+          }
       ignore_errors: yes
 
+    # -------------------- CLEANUP --------------------
     - name: Ensure no existing load balancer (cleanup)
       openstack.cloud.loadbalancer:
         cloud: "{{ cloud_name }}"
@@ -46,22 +56,7 @@
         state: absent
       ignore_errors: yes
 
-    - name: 🔔 Notify - Cleanup done
-      uri:
-        url: "{{ tower_host }}/api/v2/activity_stream/"
-        method: POST
-        headers:
-          Authorization: "Bearer {{ tower_token }}"
-          Content-Type: "application/json"
-        body_format: json
-        body:
-          operation: "update"
-          object1: "Cleanup"
-          object2: "{{ lb_name }}"
-          changes: "🧹 Verifica e rimozione di un LB precedente completata."
-        status_code: 201
-      ignore_errors: yes
-
+    # -------------------- CREATE LOAD BALANCER --------------------
     - name: Create Load Balancer (Amphora provider assumed)
       openstack.cloud.loadbalancer:
         cloud: "{{ cloud_name }}"
@@ -71,22 +66,33 @@
         wait: yes
         timeout: 800
 
-    - name: 🔔 Notify - Load Balancer created
+    - name:  Notify ManageIQ - Load Balancer created
       uri:
-        url: "{{ tower_host }}/api/v2/activity_stream/"
+        url: "https://172.16.0.174/api/automation_requests"
         method: POST
-        headers:
-          Authorization: "Bearer {{ tower_token }}"
-          Content-Type: "application/json"
+        user: "admin"
+        password: "smartvm"
+        force_basic_auth: yes
+        validate_certs: no
         body_format: json
-        body:
-          operation: "create"
-          object1: "LoadBalancer"
-          object2: "{{ lb_name }}"
-          changes: "✅ Load Balancer '{{ lb_name }}' creato con successo."
-        status_code: 201
+        body: |
+          {
+            "version": "1.1",
+            "uri_parts": {
+              "namespace": "Custom/System",
+              "class": "Request",
+              "instance": "test"
+            },
+            "parameters": {
+              "message": "✅ Load Balancer {{ lb_name }} creato con successo"
+            },
+            "requester": {
+              "auto_approve": true
+            }
+          }
       ignore_errors: yes
 
+    # -------------------- CREATE LISTENER --------------------
     - name: Create TCP Listener
       openstack.cloud.lb_listener:
         cloud: "{{ cloud_name }}"
@@ -98,22 +104,33 @@
         wait: yes
         timeout: 120
 
-    - name: 🔔 Notify - Listener created
+    - name:  Notify ManageIQ - Listener created
       uri:
-        url: "{{ tower_host }}/api/v2/activity_stream/"
+        url: "https://172.16.0.174/api/automation_requests"
         method: POST
-        headers:
-          Authorization: "Bearer {{ tower_token }}"
-          Content-Type: "application/json"
+        user: "admin"
+        password: "smartvm"
+        force_basic_auth: yes
+        validate_certs: no
         body_format: json
-        body:
-          operation: "create"
-          object1: "Listener"
-          object2: "{{ listener_name }}"
-          changes: "✅ Listener '{{ listener_name }}' creato sulla porta {{ listener_port }}."
-        status_code: 201
+        body: |
+          {
+            "version": "1.1",
+            "uri_parts": {
+              "namespace": "Custom/System",
+              "class": "Request",
+              "instance": "test"
+            },
+            "parameters": {
+              "message": " Listener TCP {{ listener_name }} creato correttamente"
+            },
+            "requester": {
+              "auto_approve": true
+            }
+          }
       ignore_errors: yes
 
+    # -------------------- CREATE POOL --------------------
     - name: Create TCP Pool
       openstack.cloud.lb_pool:
         cloud: "{{ cloud_name }}"
@@ -125,22 +142,33 @@
         wait: yes
         timeout: 120
 
-    - name: 🔔 Notify - Pool created
+    - name:  Notify ManageIQ - Pool created
       uri:
-        url: "{{ tower_host }}/api/v2/activity_stream/"
+        url: "https://172.16.0.174/api/automation_requests"
         method: POST
-        headers:
-          Authorization: "Bearer {{ tower_token }}"
-          Content-Type: "application/json"
+        user: "admin"
+        password: "smartvm"
+        force_basic_auth: yes
+        validate_certs: no
         body_format: json
-        body:
-          operation: "create"
-          object1: "Pool"
-          object2: "{{ pool_name }}"
-          changes: "✅ Pool '{{ pool_name }}' creato con algoritmo {{ lb_algorithm }}."
-        status_code: 201
+        body: |
+          {
+            "version": "1.1",
+            "uri_parts": {
+              "namespace": "Custom/System",
+              "class": "Request",
+              "instance": "test"
+            },
+            "parameters": {
+              "message": " Pool TCP {{ pool_name }} creato con successo"
+            },
+            "requester": {
+              "auto_approve": true
+            }
+          }
       ignore_errors: yes
 
+    # -------------------- ADD MEMBERS --------------------
     - name: Add members to pool
       openstack.cloud.lb_member:
         cloud: "{{ cloud_name }}"
@@ -152,23 +180,34 @@
         state: present
       loop: "{{ lb_members }}"
 
-    - name: 🔔 Notify - Members added
+    - name:  Notify ManageIQ - Members added
       uri:
-        url: "{{ tower_host }}/api/v2/activity_stream/"
+        url: "https://172.16.0.174/api/automation_requests"
         method: POST
-        headers:
-          Authorization: "Bearer {{ tower_token }}"
-          Content-Type: "application/json"
+        user: "admin"
+        password: "smartvm"
+        force_basic_auth: yes
+        validate_certs: no
         body_format: json
-        body:
-          operation: "update"
-          object1: "PoolMembers"
-          object2: "{{ pool_name }}"
-          changes: "✅ Aggiunti {{ lb_members | length }} membri al pool '{{ pool_name }}'."
-        status_code: 201
+        body: |
+          {
+            "version": "1.1",
+            "uri_parts": {
+              "namespace": "Custom/System",
+              "class": "Request",
+              "instance": "test"
+            },
+            "parameters": {
+              "message": " Membri aggiunti al pool {{ pool_name }}"
+            },
+            "requester": {
+              "auto_approve": true
+            }
+          }
       ignore_errors: yes
 
-    - name: Retrieve Load Balancer info using OpenStack SDK (no CLI)
+    # -------------------- FINAL INFO --------------------
+    - name: Retrieve Load Balancer info using OpenStack SDK 
       ansible.builtin.command: >
         python3 -c "import openstack, json;
         conn=openstack.connect(cloud='{{ cloud_name }}');
@@ -193,26 +232,37 @@
           vip_address: "{{ lb_data.vip_address }}"
           id: "{{ lb_data.id }}"
 
-    - name: 🔔 Notify - Job completed
-      uri:
-        url: "{{ tower_host }}/api/v2/activity_stream/"
-        method: POST
-        headers:
-          Authorization: "Bearer {{ tower_token }}"
-          Content-Type: "application/json"
-        body_format: json
-        body:
-          operation: "complete"
-          object1: "Job"
-          object2: "{{ lb_output.name }}"
-          changes: "🎯 Job completato con successo. LB attivo su {{ lb_output.vip_address }}"
-        status_code: 201
-      ignore_errors: yes
-
     - name: Print LB info for workflow output
-      debug:
+      ansible.builtin.debug:
         msg:
           - "✅ Load Balancer creato con successo!"
           - "Nome: {{ lb_output.name }}"
           - "VIP Address: {{ lb_output.vip_address }}"
           - "VIP Port ID: {{ lb_output.vip_port_id }}"
+
+    # -------------------- NOTIFY: Job completed --------------------
+    - name:  Notify ManageIQ - Job completed
+      uri:
+        url: "https://172.16.0.174/api/automation_requests"
+        method: POST
+        user: "admin"
+        password: "smartvm"
+        force_basic_auth: yes
+        validate_certs: no
+        body_format: json
+        body: |
+          {
+            "version": "1.1",
+            "uri_parts": {
+              "namespace": "Custom/System",
+              "class": "Request",
+              "instance": "test"
+            },
+            "parameters": {
+              "message": " ✅ Workflow completato con successo per Load Balancer {{ lb_name }}"
+            },
+            "requester": {
+              "auto_approve": true
+            }
+          }
+      ignore_errors: yes
